@@ -1,0 +1,1 @@
+python calc_valid_metrics.py --fold=1 --network-name='attunet' --input-patch-size=128 --loss-function='diceloss' --fold-name='fold1'

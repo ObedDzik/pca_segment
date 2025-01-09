@@ -1,0 +1,1 @@
+/anaconda/envs/lymphoma_seg/bin/torchrun tryallgpu.py --fold=0 --loss-fxn='dice_ce' --network-name='attunet' --epochs=1000 --input-patch-size=192 --train-bs=2 --num_workers=4 --lr=2e-4 --wd=1e-5 --val-interval=2 --sw-bs=2 --cache-rate=1 --rank='1'

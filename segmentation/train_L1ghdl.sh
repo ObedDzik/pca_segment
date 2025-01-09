@@ -1,0 +1,1 @@
+/anaconda/envs/lymphoma_seg/bin/python tryallgpu.py --fold=0 --loss-fxn='L1ghdl' --network-name='attunet' --epochs=1000 --input-patch-size=192 --train-bs=4 --num_workers=4 --lr=2e-4 --wd=1e-5 --val-interval=2 --sw-bs=2 --cache-rate=0 --rank=0

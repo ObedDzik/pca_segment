@@ -1,0 +1,1 @@
+python test_predict.py --fold=4 --network-name='segresnet' --input-patch-size=128 --num_workers=4  --sw-bs=8
