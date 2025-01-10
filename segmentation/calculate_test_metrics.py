@@ -1,8 +1,4 @@
 #%%
-'''
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the MIT License.
-'''
 import numpy as np 
 import pandas as pd 
 import SimpleITK as sitk 
@@ -84,7 +80,7 @@ single_fold_results/segresnet/fold1model/L1ghdl"
     preddir = os.path.join(RESULTS_FOLDER, 'predictions', f'fold{fold}', network, experiment_code)
     predpaths = sorted(glob(os.path.join(preddir, '*.nii.gz')))
     gtpaths = sorted(list(pd.read_csv('./../data_split/test_filepaths.csv')['GTPATH']))
-    ptpaths = sorted(list(pd.read_csv('./../data_split/test_filepaths.csv')['PTPATH'])) # PET image paths (ptpaths) for calculating the detection metrics using criterion3 
+    ptpaths = sorted(list(pd.read_csv('./../data_split/test_filepaths.csv')['PTPATH'])) 
     
     imageids = [os.path.basename(path)[:-7] for path in gtpaths]
     TEST_DSCs, TEST_FPVs, TEST_FNVs = [], [], []

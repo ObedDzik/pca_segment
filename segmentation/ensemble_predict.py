@@ -28,24 +28,17 @@ pred_fold4 = []
 
 transforms = Compose([LoadImaged(keys="image")])
 
-# Function to load images with MONAI and store them in lists
 def load_images(preds_folder, preds_list):
     images = []
     for i in range(len(preds_list)):
-        # Create a dictionary for each image
         data_dict = {"image": os.path.join(preds_folder, preds_list[i])}
-        
-        # Apply the transform to load the image with metadata
         dataset = Dataset(data=[data_dict], transform=transforms)
         dataloader = DataLoader(dataset, batch_size=1)
-        
         for batch in dataloader:
-            image = batch["image"]  # This is a MetaTensor with metadata
+            image = batch["image"]
             images.append(image)
-    
     return images
 
-# Load images for each fold using the MONAI pipeline
 pred_fold0 = load_images(preds_folder[0], preds_list[0])
 pred_fold1 = load_images(preds_folder[1], preds_list[1])
 pred_fold2 = load_images(preds_folder[2], preds_list[2])
