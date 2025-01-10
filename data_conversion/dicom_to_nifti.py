@@ -102,7 +102,7 @@ save_dir_gt = './../../../../../../data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/c
 ############################################################################################
 ############################################################################################
 
-cases = pd.read_csv('/home/jhubadmin/Desktop/segmentation_research/lymphoma-segmentation-dnn/data_conversion/dicom_ctpt_to_nifti_conversion_file.csv')
+cases = pd.read_csv('/home/jhubadmin/Desktop/segmentation_research/pca_segment/data_conversion/dicom_ctpt_to_nifti_conversion_file.csv')
 cases = list(cases.itertuples(index=False, name=None)) 
 # structs = pd.read_csv('/home/jhubadmin/Desktop/segmentation_research/lymphoma-segmentation-dnn/data_conversion/dicom_rtstruct_to_nifti_conversion_file.csv')
 # structs = list(structs.itertuples(index=False, name=None))
