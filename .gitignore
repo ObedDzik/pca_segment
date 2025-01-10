@@ -26,3 +26,9 @@ segmentation/tryallgpu.py
 segmentation/train_dfl.sh
 segmentation/train_L1ghdl.sh
 segmentation/trainddp.py
+segmentation/calc_valid_metrics.py
+segmentation/calc_valid_metrics.sh
+segmentation/calculate_ensemble_test_metrics.py
+segmentation/data_explore.py
+segmentation/valid_predict.py
+segmentation/visualize_pred.py
