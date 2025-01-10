@@ -8,7 +8,7 @@ import os
 #%%
 #THINGS TO CHANGE
 fold = 0
-WORKING_FOLDER = "/home/jhubadmin/Desktop/segmentation_research/lymphoma-segmentation-dnn/"
+WORKING_FOLDER = "/home/jhubadmin/Desktop/segmentation_research/pca_segment/"
 pred_dir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
 validation_predictions/unet/fold0/L1ghdlfocal/predictions/fold0/unet/unet_fold0_randcrop128/" 
 save_path = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\

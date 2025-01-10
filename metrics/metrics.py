@@ -1,8 +1,3 @@
-'''
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the MIT License.
-'''
-
 import SimpleITK as sitk 
 import numpy as np  
 import cc3d
