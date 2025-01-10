@@ -22,3 +22,7 @@ segmentation/plot_lesions_new_ipynb
 segmentation/plotss.png
 segmentation/*.csv
 segmentation/rough.ipynb
+segmentation/tryallgpu.py
+segmentation/train_dfl.sh
+segmentation/train_L1ghdl.sh
+segmentation/trainddp.py

@@ -1,7 +1,3 @@
-'''
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the MIT License.
-'''
 from monai.transforms import (
     AsDiscrete,
     Compose,
@@ -28,8 +24,7 @@ from initialize_train import (
     get_optimizer, 
     get_scheduler,
     get_metric,
-    get_validation_sliding_window_size, 
-    compute_mean_std
+    get_validation_sliding_window_size,
 )
 
 import sys
@@ -48,12 +43,6 @@ def get_results_folder(args):
         RESULTS_FOLDER = "/data/blobfuse/MULTITRACER_DATASET/results/dice_ce_results"
     return RESULTS_FOLDER
 
-    # if args.loss_fxn == "dice_ce":
-    #     RESULTS_FOLDER = "/data/blobfuse/MULTITRACER_DATASET/results/dice_ce_results"
-    # elif args.loss_fxn == "L1ghdl":
-    #     RESULTS_FOLDER = "/data/blobfuse/MULTITRACER_DATASET/results/L1ghdlfocal_results"
-    # return RESULTS_FOLDER
-
 #%%
 
 def convert_to_4digits(str_num):
@@ -70,6 +59,8 @@ def convert_to_4digits(str_num):
 #%%
 def load_train_objects(args):
     train_data, valid_data = get_train_valid_data_in_dict_format(args.fold) 
+    train_transforms = get_train_transforms(args.input_patch_size)
+    valid_transforms = get_valid_transforms()
     model = get_model(args.network_name, args.input_patch_size) 
     optimizer = get_optimizer(model, learning_rate=args.lr, weight_decay=args.wd)
     loss_function = get_loss_function(args.loss_fxn)
@@ -79,21 +70,14 @@ def load_train_objects(args):
     return (
         train_data,
         valid_data,
+        train_transforms,
+        valid_transforms,
         model,
         loss_function,
         optimizer,
         scheduler,
         metric
     )
-
-def load_transforms(train_data, args):
-    print("Calculating mean and std...")
-    pet_mean, pet_std = compute_mean_std(train_data)
-    print(f"Mean = {pet_mean}, std = {pet_std}")
-    train_transforms = get_train_transforms(pet_mean, pet_std, args.input_patch_size)
-    valid_transforms = get_valid_transforms(pet_mean, pet_std)
-    
-    return (train_transforms, valid_transforms)
 
 def prepare_dataset(data, transforms, args):
     dataset = CacheDataset(data=data, transform=transforms, cache_rate=args.cache_rate, num_workers=args.num_workers)
@@ -106,18 +90,17 @@ def main_worker(save_models_dir, save_logs_dir, args):
     device = torch.device(f"cuda:{args.rank}" if torch.cuda.is_available() else "cpu")
     local_rank = device.index
     print(local_rank)
-    # if local_rank == 0:
     print(f"Training {args.network_name} on fold {args.fold}")
     print(f"The models will be saved in {save_models_dir}")
     print(f"The training/validation logs will be saved in {save_logs_dir}")
 
     # get all training and validation objects
-    train_data, valid_data, model, loss_function, optimizer, scheduler, metric = load_train_objects(args)
-    train_transforms, valid_transforms = load_transforms(train_data, args)
+    train_data, valid_data, train_transforms, valid_transforms, model, loss_function, optimizer, scheduler, metric = load_train_objects(args)
+
     # get dataset of object-type CacheDataset 
     train_dataset = prepare_dataset(train_data, train_transforms, args)
     valid_dataset = prepare_dataset(valid_data, valid_transforms, args)
-    
+
     # initializing train and valid dataloaders
     train_dataloader = DataLoader(
         train_dataset,
@@ -266,8 +249,8 @@ if __name__ == "__main__":
                         help='network name for training (default: unet)')
     parser.add_argument('--epochs', type=int, default=500, metavar='epochs',
                         help='number of epochs to train (default: 10)')
-    parser.add_argument('--input-patch-size', type=int, default=192, metavar='inputsize',
-                        help='size of cropped input patch for training (default: 192)')
+    parser.add_argument('--input-patch-size', type=int, default=128, metavar='inputsize',
+                        help='size of cropped input patch for training (default: 128)')
     parser.add_argument('--train-bs', type=int, default=1, metavar='train-bs',
                         help='mini-batchsize for training (default: 1)')
     parser.add_argument('--num_workers', type=int, default=2, metavar='nw',

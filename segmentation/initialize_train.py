@@ -1,10 +1,4 @@
-'''
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the MIT License.
-'''
-
 from monai.transforms import Transform
-
 from monai.transforms import (
     EnsureChannelFirstd,
     Compose,
@@ -27,10 +21,10 @@ from monai.transforms import (
     NormalizeIntensityd
 )
 from monai.networks.layers import Norm
-from monai.networks.nets import UNet, SegResNet, DynUNet, SwinUNETR, UNETR, AttentionUnet
+from monai.networks.nets import UNet, SegResNet, AttentionUnet
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss, DiceFocalLoss, DiceCELoss
-from losses import GHMDiceLoss, GHMDiceLoss1
+from losses import L1DFL
 from monai.networks import one_hot
 import torch
 import matplotlib.pyplot as plt
@@ -61,7 +55,6 @@ def create_dictionary_ctptgt(ctpaths, ptpaths, gtpaths):
     for i in range(len(gtpaths)):
         ctpath = ctpaths[i]
         ptpath = ptpaths[i]
-        # organmaskpath = organmaskpaths[i]
         gtpath = gtpaths[i]
         data.append({ 'CT':ctpath, 'PT':ptpath,'GT':gtpath})
     return data
@@ -93,7 +86,6 @@ def create_data_split_files():
 
         ctpaths = sorted(glob(os.path.join(imagesTr, '*0000.nii.gz')))
         ptpaths = sorted(glob(os.path.join(imagesTr, '*0001.nii.gz')))
-        # organmaskpaths = sorted(glob(os.path.join(imagesTr, "*0002.nii.gz")))
         gtpaths = sorted(glob(os.path.join(labelsTr, '*.nii.gz')))
         imageids = [remove_all_extensions(os.path.basename(path)) for path in gtpaths]
 
@@ -120,7 +112,6 @@ def create_data_split_files():
         labelsTs = os.path.join(DATA_FOLDER, 'labelsTs')
         ctpaths_test = sorted(glob(os.path.join(imagesTs, '*0000.nii.gz')))
         ptpaths_test = sorted(glob(os.path.join(imagesTs, '*0001.nii.gz')))
-        # organmaskpaths_test = sorted(glob(os.path.join(imagesTs, '*0002.nii.gz')))
         gtpaths_test = sorted(glob(os.path.join(labelsTs, '*.nii.gz')))
         imageids_test = [remove_all_extensions(os.path.basename(path)) for path in gtpaths_test]
         test_data = np.column_stack((imageids_test, ctpaths_test, ptpaths_test,  gtpaths_test))
@@ -172,106 +163,7 @@ def get_spacing():
 #             print(f"{key}: {data[key].shape}")
 #         return data
 
-def compute_mean_std(train_dataset):
-    sum_pixels, sum_squares, num_pixels = 0.0, 0.0, 0
-    
-    for data in train_dataset:
-        pt_path = data["PT"]
-        nb_image = nb.load(pt_path).get_fdata()
-        image = torch.tensor(nb_image, dtype=torch.float32)
-        nonzero_pixels = image[image > 0]
-        if nonzero_pixels.numel() > 0:
-            sum_pixels += torch.sum(nonzero_pixels)
-            sum_squares += torch.sum(nonzero_pixels ** 2)
-            num_pixels += nonzero_pixels.numel()
-    if num_pixels > 0:
-        mean = sum_pixels / num_pixels
-        variance = (sum_squares / num_pixels) - (mean ** 2)
-        std = torch.sqrt(variance)
-    else:
-        mean, std = 0.0, 1.0
-    return mean.item(), std.item()
-
-
-class CustomRandCropByPosNegLabel(Transform):
-    def __init__(self, mod_keys, crop_size=(96, 96, 96), num_samples=1):
-        self.crop_size = crop_size
-        self.num_samples = num_samples
-        self.mod_keys = mod_keys
-        self.rand_crop = RandCropByPosNegLabeld(
-            keys=self.mod_keys,
-            label_key='GT',
-            spatial_size=self.crop_size, 
-            pos=4, 
-            neg=1, 
-            num_samples=self.num_samples,
-            image_key='PT',
-            image_threshold=0,
-            allow_smaller=True
-        )
-        self.rand_crop_fallback = RandSpatialCropSamplesd(
-            keys=self.mod_keys,
-            roi_size=self.crop_size, 
-            num_samples=self.num_samples,
-            random_center=True, 
-            random_size=False
-        )
-
-    def __call__(self, data):
-        label = data['GT']
-        # Check if the label has any positive (lesion) voxels
-        if torch.sum(label) > 0:
-            result = self.rand_crop(data)
-            return result
-        else:
-            # Apply a fallback transform if no lesion is present
-            result = self.rand_crop_fallback(data)
-            return result
-            
-def get_train_transforms(pet_mean, pet_std, input_patch_size=192):
-    spatialsize = get_spatial_size(input_patch_size)
-    spacing = get_spacing()
-    mod_keys = ['CT', 'PT', 'GT']
-    
-    train_transforms = Compose(
-    [
-        LoadImaged(keys=mod_keys, image_only=False),
-        EnsureChannelFirstd(keys=mod_keys, channel_dim='no_channel'),
-        CropForegroundd(keys=mod_keys, source_key='CT'),
-        ScaleIntensityd(keys=['CT'], minv=0, maxv=1),
-        NormalizeIntensityd(keys=['PT'], subtrahend=pet_mean, divisor=pet_std, nonzero=True),  # PET normalization
-        Orientationd(keys=mod_keys, axcodes="RAS"),
-        Spacingd(keys=mod_keys, pixdim=spacing, mode=('bilinear', 'bilinear', 'nearest')),
-        
-        # Use the custom RandCropByPosNegLabel
-        CustomRandCropByPosNegLabel(
-            crop_size=spatialsize,
-            num_samples=1,
-            mod_keys = mod_keys
-        ),
-        
-        ResizeWithPadOrCropd(
-            keys=mod_keys,
-            spatial_size=spatialsize,
-            mode='constant'
-        ),
-        RandAffined(
-            keys=mod_keys,
-            mode=('bilinear', 'bilinear', 'nearest'),
-            prob=0.5,
-            spatial_size=spatialsize,
-            translate_range=(10, 10, 10),
-            rotate_range=(0, 0, np.pi / 15),
-            scale_range=(0.1, 0.1, 0.1)
-        ),
-        ConcatItemsd(keys=['CT', 'PT'], name='CTPT', dim=0),
-        DeleteItemsd(keys=['CT', 'PT'])
-    ])
-    
-    return train_transforms
-
-
-def get_train_transforms(input_patch_size=192):
+def get_train_transforms(input_patch_size=128):
     spatialsize = get_spatial_size(input_patch_size)
     spacing = get_spacing()
     mod_keys = ['CT', 'PT',  'GT']
@@ -281,7 +173,6 @@ def get_train_transforms(input_patch_size=192):
         EnsureChannelFirstd(keys=mod_keys, channel_dim='no_channel'),
         CropForegroundd(keys=mod_keys, source_key='CT'),
         ScaleIntensityd(keys=['CT'], minv=0, maxv=1),
-        # # ScaleIntensityRanged(keys=['CT'], a_min = -1500, a_max = 3071, b_min=0, b_max=1, clip=True),
         Orientationd(keys=mod_keys, axcodes="RAS"),
         Spacingd(keys=mod_keys, pixdim=spacing, mode=('bilinear', 'bilinear', 'nearest')),
         RandCropByPosNegLabeld(
@@ -316,7 +207,7 @@ def get_train_transforms(input_patch_size=192):
     return train_transforms
 
 #%%
-def get_valid_transforms(pet_mean, pet_std):
+def get_valid_transforms():
     spacing = get_spacing()
     mod_keys = ['CT', 'PT', 'GT']
     valid_transforms = Compose(
@@ -325,8 +216,6 @@ def get_valid_transforms(pet_mean, pet_std):
         EnsureChannelFirstd(keys=mod_keys),
         CropForegroundd(keys=mod_keys, source_key='CT'),
         ScaleIntensityd(keys=['CT'], minv=0, maxv=1),
-        NormalizeIntensityd(keys=['PT'], subtrahend=pet_mean, divisor=pet_std, nonzero=True),
-        # ScaleIntensityRanged(keys=['CT'], a_min = -1500, a_max = 3071, b_min=0, b_max=1, clip=True),
         Orientationd(keys=mod_keys, axcodes="RAS"),
         Spacingd(keys=mod_keys, pixdim=spacing, mode=('bilinear', 'bilinear', 'nearest')),
         ConcatItemsd(keys=['CT', 'PT'], name='CTPT', dim=0),
@@ -384,26 +273,16 @@ def get_kernels_strides(patch_size, spacings):
     kernels.append(len(spacings) * [3])
     return kernels, strides
 #%%
-def get_model(network_name = 'unet', input_patch_size=192):
+def get_model(network_name = 'unet', input_patch_size=128):
     if network_name == 'unet':
         model = UNet(
             spatial_dims=3,
-            in_channels=2, #Changed to 3 for the organ mask
+            in_channels=2,
             out_channels=2,
             channels=(16, 32, 64, 128, 256, 512),
             strides=(2, 2, 2, 2, 2),
             num_res_units=2,
             norm=Norm.BATCH
-        )
-        
-    elif network_name == 'swinunetr':
-        spatialsize = get_spatial_size(input_patch_size)
-        model = SwinUNETR(
-            img_size=spatialsize,
-            in_channels=2,
-            out_channels=2,
-            feature_size=12,
-            use_checkpoint=False,
         )
     elif network_name =='segresnet':
         model = SegResNet(
@@ -429,17 +308,11 @@ def get_model(network_name = 'unet', input_patch_size=192):
 
 
 #%%
-def get_loss_function(loss_func = 'dicefocal'):
-    if loss_func == "dicefocal":
-        loss_function = DiceFocalLoss(to_onehot_y=True, softmax=True, lambda_dice=1.0, lambda_focal=1.0)
-    elif loss_func == "diceloss":
-        loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    elif loss_func == "dice_ce":
-        loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
-    elif loss_func == "L1ghdl":
-        loss_function = GHMDiceLoss()
-    elif loss_func == "1L1ghdl":
-        loss_function = GHMDiceLoss1()
+def get_loss_function():
+    # loss_function = DiceFocalLoss(to_onehot_y=True, softmax=True, lambda_dice=1.0, lambda_focal=1.0)
+    # loss_function = DiceLoss(to_onehot_y=True, softmax=True)
+    # loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
+    loss_function = L1DFL()
     return loss_function
 
 def get_optimizer(model, learning_rate=2e-4, weight_decay=1e-5):
@@ -454,7 +327,7 @@ def get_scheduler(optimizer, max_epochs=1000):
     scheduler = CosineAnnealingLR(optimizer, T_max=max_epochs, eta_min=0)
     return scheduler
 
-def get_validation_sliding_window_size(input_patch_size=192):
+def get_validation_sliding_window_size(input_patch_size=128):
     dict_W_for_N = {
         64:64,
         128:128,

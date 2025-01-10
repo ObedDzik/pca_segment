@@ -156,7 +156,6 @@ def main_worker(save_models_dir, save_logs_dir, args):
         print(f"[GPU{local_rank}]: Running training: epoch = {epoch + 1}")
         model.train()
         epoch_loss = 0
-        # no_weight_epoch_loss = 0
         step = 0
         train_sampler.set_epoch(epoch)
         for batch_data in train_dataloader:
@@ -169,9 +168,7 @@ def main_worker(save_models_dir, save_logs_dir, args):
             
             with autocast(): #MixedPrecisionTraining
                 outputs = model(inputs)
-                loss = loss_function(outputs, labels, device)
-                
-                # loss = batchwise_diceloss_5d(outputs, labels)
+                loss = loss_function(outputs, labels)
             # loss.backward()             
             scaler.scale(loss).backward()  #MixedPrecisionTraining
             # optimizer.step()
@@ -260,8 +257,8 @@ if __name__ == "__main__":
                         help='network name for training (default: unet)')
     parser.add_argument('--epochs', type=int, default=500, metavar='epochs',
                         help='number of epochs to train (default: 10)')
-    parser.add_argument('--input-patch-size', type=int, default=192, metavar='inputsize',
-                        help='size of cropped input patch for training (default: 192)')
+    parser.add_argument('--input-patch-size', type=int, default=128, metavar='inputsize',
+                        help='size of cropped input patch for training (default: 128)')
     parser.add_argument('--train-bs', type=int, default=1, metavar='train-bs',
                         help='mini-batchsize for training (default: 1)')
     parser.add_argument('--num_workers', type=int, default=2, metavar='nw',
