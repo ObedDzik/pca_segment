@@ -21,7 +21,7 @@ from monai.transforms import (
     NormalizeIntensityd
 )
 from monai.networks.layers import Norm
-from monai.networks.nets import UNet, SegResNet, AttentionUnet
+from monai.networks.nets import UNet, SegResNet, AttentionUnet, UNETR
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss, DiceFocalLoss, DiceCELoss
 from losses import L1DFL
@@ -301,6 +301,21 @@ def get_model(network_name = 'unet', input_patch_size=128):
             channels=(16, 32, 64, 128, 256, 512),
             strides=(2,2,2,2,2)
         )
+    elif network_name == 'unetr':
+        model = UNETR(
+            in_channels=2,
+            out_channels=2,
+            img_size=(128, 128, 128),
+            feature_size=16,
+            hidden_size=768,
+            mlp_dim=3072,
+            num_heads=12,
+            pos_embed="perceptron",
+            norm_name="batch",
+            res_block=True,
+            use_checkpoint=True
+)
+
 
     else:
         pass
