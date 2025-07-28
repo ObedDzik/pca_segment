@@ -4,7 +4,9 @@ import torch.nn.functional as F
 from monai.losses import FocalLoss
 
 def one_hot_encoding(targets, C=2):
-    return F.one_hot(targets.long().squeeze(1), num_classes=C).permute(0, 4, 1, 2, 3).float()
+    return F.one_hot(
+        targets.long().squeeze(1), num_classes=C
+    ).permute(0, 4, 1, 2, 3).float().to(targets.device)
 
 class L1DFL(nn.Module):
     def __init__(self, gamma=2, bins=10, epsilon=0.1):
@@ -12,7 +14,7 @@ class L1DFL(nn.Module):
         self.gamma = gamma
         self.bins = bins
         self.epsilon = epsilon
-        self.edges = torch.linspace(0, 1, bins + 1).cuda()
+        self.register_buffer("edges", torch.linspace(0, 1, bins + 1))
         self.focal = FocalLoss(gamma=self.gamma, use_softmax=True, to_onehot_y=False)
 
     def forward(self, logits, labels):

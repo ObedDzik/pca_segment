@@ -310,10 +310,8 @@ def get_model(network_name = 'unet', input_patch_size=128):
             hidden_size=768,
             mlp_dim=3072,
             num_heads=12,
-            pos_embed="perceptron",
             norm_name="batch",
-            res_block=True,
-            use_checkpoint=True
+            res_block=True
 )
 
 

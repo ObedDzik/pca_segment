@@ -225,7 +225,7 @@ def main_worker(save_models_dir, save_logs_dir, args):
     dist.destroy_process_group()
 
 def main(args):
-    os.environ['OMP_NUM_THREADS'] = '6'
+    os.environ['OMP_NUM_THREADS'] = '4'
     fold = args.fold
     network = args.network_name
     inputsize = f'randcrop{args.input_patch_size}'
