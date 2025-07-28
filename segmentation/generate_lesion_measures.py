@@ -1,7 +1,3 @@
-# '''
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-# '''
 import pandas as pd 
 import numpy as np
 import SimpleITK as sitk 
@@ -18,7 +14,6 @@ from metrics.metrics import *
 def get_spacing_from_niftipath(path):
     spacing = sitk.ReadImage(path).GetSpacing()
     return spacing
-
 
 def main(args):
     fold = args.fold
@@ -56,7 +51,6 @@ single_fold_results/attunet/fold1model/L1ghdl"
     # valid_df = trainvalid_df[trainvalid_df['FoldID'] == fold]
     # ptpaths = valid_df["PTPATH"].values
     # gtpaths = valid_df["GTPATH"].values
-    
     
     imageids = [os.path.basename(path)[:-7] for path in gtpaths]
     DSC = [] 
@@ -168,7 +162,6 @@ single_fold_results/attunet/fold1model/L1ghdl"
     )
     data_df.to_csv(filepath, index=False)
         
-
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser(description='PSMA PET/CT lesion segmentation using MONAI-PyTorch')
     parser.add_argument('--fold', type=int, default=0, metavar='fold',
