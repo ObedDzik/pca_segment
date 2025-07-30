@@ -303,17 +303,17 @@ def get_model(network_name = 'unet', input_patch_size=128):
         )
     elif network_name == 'unetr':
         model = UNETR(
-            in_channels=2,
+            in_channels=2,  
             out_channels=2,
-            img_size=(128, 128, 128),
-            feature_size=8,
-            hidden_size=192,
-            mlp_dim=768,
-            num_heads=3,
-            pos_embed='conv',
+            img_size=(96, 96, 96),        
+            feature_size=16,
+            hidden_size=768,              
+            mlp_dim=3072,                 
+            num_heads=12,                 
+            proj_type="conv",
             norm_name="instance",
-            res_block=True
-)
+            res_block=True,
+        )
     else:
         pass
     return model
