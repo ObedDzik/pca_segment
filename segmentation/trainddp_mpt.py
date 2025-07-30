@@ -17,6 +17,7 @@ import time
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist 
+from monai.utils.misc import ensure_tuple_rep
 import os
 from initialize_train import (
     create_data_split_files,
@@ -83,6 +84,18 @@ def prepare_dataset(data, transforms, args):
     dataset = CacheDataset(data=data, transform=transforms, cache_rate=args.cache_rate, num_workers=args.num_workers)
     return dataset
 
+# freeze encoder
+def freeze_encoder(model):
+    for name, param in model.vit.named_parameters():
+        if "patch_embed.proj" not in name:
+            param.requires_grad = False
+
+# unfreeze encoder
+def unfreeze_encoder(model):
+    for param in model.vit.parameters():
+        param.requires_grad = True
+
+
 def main_worker(save_models_dir, save_logs_dir, args):
     # init_process_group
     
@@ -131,18 +144,44 @@ def main_worker(save_models_dir, save_logs_dir, args):
     # filepaths for storing training and validation logs from different GPUs
     trainlog_fpath = os.path.join(save_logs_dir, f'trainlog_gpu{local_rank}.csv')
     validlog_fpath = os.path.join(save_logs_dir, f'validlog_gpu{local_rank}.csv')
-
-    # initialize the GPU device    
+    
     device = torch.device(f"cuda:{local_rank}")
     torch.cuda.set_device(device)
 
     # number of epochs and epoch interval for running validation
     max_epochs = args.epochs
     val_interval = args.val_interval
+    
+    if args.network_name == "unetr":
+        vit_encoder = model.vit
+        patch_size = ensure_tuple_rep(vit_encoder.patch_embed.patch_size, 3)
+        embedding_dim = vit_encoder.hidden_size
 
-    # push models to device
+        # Replacing the first conv layer because of mismatch with pretrained network
+        vit_encoder.patch_embed.proj = torch.nn.Conv3d(
+            in_channels=2,
+            out_channels=embedding_dim,
+            kernel_size=patch_size,
+            stride=patch_size,
+        )
+        
+        print("Loading Weights from the Path")
+        
+        ckpt = torch.load("/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/ssl_pretrained_weights.pth")
+        encoder_dict = {
+            k.replace("module.", "").replace("encoder.", ""): v
+            for k, v in ckpt["state_dict"].items()
+            if "encoder" in k and "patch_embed.proj" not in k
+        }
+
+        # Load into model's ViT encoder
+        missing, unexpected = model.vit.load_state_dict(encoder_dict, strict=False)
+        
+        print("Loaded pretrained weights (except input conv)")
+        print(f"Missing keys: {missing}")
+        print(f"Unexpected keys: {unexpected}")
+
     model = model.to(device)
-
     epoch_loss_values = []
     metric_values = []
 
@@ -152,6 +191,14 @@ def main_worker(save_models_dir, save_logs_dir, args):
     scaler = GradScaler() #MixedPrecisionTraining
 
     for epoch in range(max_epochs):
+        
+        if epoch == 0:
+            freeze_encoder(model)
+            print("Encoder frozen.")
+        elif epoch == 10:
+            unfreeze_encoder(model)
+            print("Encoder unfrozen.")
+        
         epoch_start_time = time.time()
         if dist.get_rank() == 0:
             print(f"[GPU{local_rank}]: Running training: epoch = {epoch + 1}")
