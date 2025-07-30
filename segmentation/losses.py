@@ -18,9 +18,10 @@ class L1DFL(nn.Module):
         self.focal = FocalLoss(gamma=self.gamma, use_softmax=True, to_onehot_y=False)
 
     def forward(self, logits, labels):
-        logits = logits.type(torch.float64)
-        labels = labels.type(torch.float64)
-        probabilities = torch.softmax(logits, 1, torch.float64)
+        logits = logits - logits.max(dim=1, keepdim=True)[0]
+        logits = logits.float()
+        
+        probabilities = torch.softmax(logits, dim=1)
         targets = one_hot_encoding(labels)
         focal_loss = self.focal(logits, targets)
         
@@ -28,17 +29,18 @@ class L1DFL(nn.Module):
         g = gradients.view(-1)
         N = g.size(0)
         gd = torch.zeros_like(g)
-        # counts = []
+        
         for center in self.edges:
             mask = (g >= center - self.epsilon/2) & (g < center + self.epsilon/2)
             count_in_region = mask.sum().item()
             valid_length = min(center + self.epsilon/2, 1) - max(center - self.epsilon/2, 0)
-            gd[mask] = (count_in_region / valid_length).type(torch.float64)
-            # counts.append(count_in_region / valid_length)
-        beta = N / (gd + 1e-8)
+            gd[mask] = (count_in_region / valid_length)
+
+        beta_raw = N / (gd + 1e-3)
+        beta = beta_raw / beta_raw.mean()
         beta = beta.view_as(gradients)
         weighted_intersection = (beta * probabilities * targets).sum(dim=[2, 3, 4])
         weighted_union = (beta*(probabilities**2 + targets**2)).sum(dim=[2, 3, 4])
-        dice_score = (2. * weighted_intersection + 1e-8) / (weighted_union + 1e-8)
+        dice_score = (2. * weighted_intersection + 1e-8) / (weighted_union + 1e-8)            
         loss = (1 - dice_score.mean())+focal_loss
         return loss
