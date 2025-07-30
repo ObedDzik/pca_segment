@@ -153,7 +153,8 @@ def main_worker(save_models_dir, save_logs_dir, args):
 
     for epoch in range(max_epochs):
         epoch_start_time = time.time()
-        print(f"[GPU{local_rank}]: Running training: epoch = {epoch + 1}")
+        if dist.get_rank() == 0:
+            print(f"[GPU{local_rank}]: Running training: epoch = {epoch + 1}")
         model.train()
         epoch_loss = 0
         step = 0
@@ -176,7 +177,8 @@ def main_worker(save_models_dir, save_logs_dir, args):
             scaler.update()  #MixedPrecisionTraining
             epoch_loss += loss.item()
         epoch_loss /= step
-        print(f"[GPU:{local_rank}]: epoch {epoch + 1}/{max_epochs}: average loss: {epoch_loss:.4f}")
+        if dist.get_rank() == 0:
+            print(f"[GPU:{local_rank}]: epoch {epoch + 1}/{max_epochs}: average loss: {epoch_loss:.4f}")
         epoch_loss_values.append(epoch_loss)
 
         # steps forward the CosineAnnealingLR scheduler
@@ -188,7 +190,8 @@ def main_worker(save_models_dir, save_logs_dir, args):
 
 
         if (epoch + 1) % val_interval == 0:
-            print(f"[GPU{local_rank}]: Running validation")
+            if dist.get_rank() == 0:
+                print(f"[GPU{local_rank}]: Running validation")
             model.eval()
             with torch.no_grad():
                 for val_data in valid_dataloader:
@@ -212,15 +215,18 @@ def main_worker(save_models_dir, save_logs_dir, args):
                 metric_values_df = pd.DataFrame(data=metric_values, columns=['Metric'])
                 metric_values_df.to_csv(validlog_fpath, index=False)
             
-                print(f"[GPU:{local_rank}] SAVING MODEL at epoch: {epoch + 1}; Mean DSC: {metric_val:.4f}")
+                if dist.get_rank() == 0:
+                    print(f"[GPU:{local_rank}] SAVING MODEL at epoch: {epoch + 1}; Mean DSC: {metric_val:.4f}")
                 savepath = os.path.join(save_models_dir, "model_ep="+convert_to_4digits(str(int(epoch + 1)))+".pth")
                 torch.save(model.module.state_dict(), savepath)
 
         epoch_end_time = (time.time() - epoch_start_time)/60
-        print(f"[GPU:{local_rank}]: Epoch {epoch + 1} time: {round(epoch_end_time,2)} min")
+        if dist.get_rank() == 0:
+            print(f"[GPU:{local_rank}]: Epoch {epoch + 1} time: {round(epoch_end_time,2)} min")
        
     experiment_end_time = (time.time() - experiment_start_time)/(60*60)
-    print(f"[GPU:{local_rank}]: Total time: {round(experiment_end_time,2)} hr")
+    if dist.get_rank() == 0:
+        print(f"[GPU:{local_rank}]: Total time: {round(experiment_end_time,2)} hr")
 
     dist.destroy_process_group()
 
