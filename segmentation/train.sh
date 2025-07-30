@@ -1,1 +1,1 @@
-OMP_NUM_THREADS=4 /anaconda/envs/lymphoma_seg/bin/torchrun --standalone --nproc_per_node=2 trainddp_mpt.py --fold=1 --network-name='unetr' --epochs=1000 --input-patch-size=128 --train-bs=4 --num_workers=4 --lr=2e-4 --wd=1e-5 --val-interval=2 --sw-bs=4 --cache-rate=1
+OMP_NUM_THREADS=4 /anaconda/envs/lymphoma_seg/bin/torchrun --standalone --nproc_per_node=2 trainddp_mpt.py --fold=1 --network-name='unetr' --epochs=1000 --input-patch-size=96 --train-bs=4 --num_workers=4 --lr=2e-4 --wd=1e-5 --val-interval=2 --sw-bs=4 --cache-rate=1
