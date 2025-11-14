@@ -4,43 +4,57 @@ import torch.nn.functional as F
 from monai.losses import FocalLoss
 
 def one_hot_encoding(targets, C=2):
-    return F.one_hot(
-        targets.long().squeeze(1), num_classes=C
-    ).permute(0, 4, 1, 2, 3).float().to(targets.device)
+    return F.one_hot(targets.long().squeeze(1), num_classes=C).permute(0, 4, 1, 2, 3).float()
 
 class L1DFL(nn.Module):
-    def __init__(self, gamma=2, bins=10, epsilon=0.1):
-        super(L1DFL, self).__init__()
+    def __init__(self, gamma=2, epsilon=0.05):
+        super().__init__()
         self.gamma = gamma
-        self.bins = bins
+        self.bins = int((1/epsilon) +1)
         self.epsilon = epsilon
-        self.register_buffer("edges", torch.linspace(0, 1, bins + 1))
+        self.register_buffer("bin_centers", torch.linspace(0, 1, self.bins))
         self.focal = FocalLoss(gamma=self.gamma, use_softmax=True, to_onehot_y=False)
 
     def forward(self, logits, labels):
-        logits = logits - logits.max(dim=1, keepdim=True)[0]
-        logits = logits.float()
+        device = logits.device
+
+        if logits.ndim == 5:  # 3D
+            spatial_dims = [2, 3, 4]
+        elif logits.ndim == 4:  # 2D
+            spatial_dims = [2, 3]
+        else:
+            raise ValueError(f"Unexpected logits shape: {logits.shape}")
         
+        logits = logits.float()
         probabilities = torch.softmax(logits, dim=1)
+        
         targets = one_hot_encoding(labels)
         focal_loss = self.focal(logits, targets)
-        
+
         gradients = torch.abs(probabilities - targets)
         g = gradients.view(-1)
-        N = g.size(0)
-        gd = torch.zeros_like(g)
-        
-        for center in self.edges:
-            mask = (g >= center - self.epsilon/2) & (g < center + self.epsilon/2)
-            count_in_region = mask.sum().item()
-            valid_length = min(center + self.epsilon/2, 1) - max(center - self.epsilon/2, 0)
-            gd[mask] = (count_in_region / valid_length)
+        N = g.numel()
 
-        beta_raw = N / (gd + 1e-3)
-        beta = beta_raw / beta_raw.mean()
+        bin_centers = self.bin_centers.to(device)
+        left_edges = torch.clamp(bin_centers - self.epsilon / 2, min=0)
+        right_edges = torch.clamp(bin_centers + self.epsilon / 2, max=1)
+        widths = right_edges - left_edges
+
+        bucket_idx = torch.bucketize(g, boundaries=left_edges, right=True) - 1
+        bucket_idx = torch.clamp(bucket_idx, min=0, max=self.bins - 1)
+
+        counts = torch.zeros_like(bin_centers, device=device)
+        counts = counts.scatter_add(0, bucket_idx, torch.ones_like(g))
+
+        density = counts / (widths + 1e-8)
+
+        beta = density[bucket_idx]
+        beta = N / (beta + 1e-8)
         beta = beta.view_as(gradients)
-        weighted_intersection = (beta * probabilities * targets).sum(dim=[2, 3, 4])
-        weighted_union = (beta*(probabilities**2 + targets**2)).sum(dim=[2, 3, 4])
-        dice_score = (2. * weighted_intersection + 1e-8) / (weighted_union + 1e-8)            
-        loss = (1 - dice_score.mean())+focal_loss
+
+        weighted_intersection = (beta * probabilities * targets).sum(dim=spatial_dims)
+        weighted_union = (beta * (probabilities**2 + targets**2)).sum(dim=spatial_dims)
+        dice_score = (2. * weighted_intersection + 1e-8) / (weighted_union + 1e-8)
+
+        loss = (1 - dice_score.mean()) + focal_loss
         return loss
