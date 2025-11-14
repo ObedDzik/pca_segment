@@ -21,7 +21,9 @@ from monai.transforms import (
     NormalizeIntensityd
 )
 from monai.networks.layers import Norm
-from monai.networks.nets import UNet, SegResNet, AttentionUnet, UNETR
+from functools import partial
+import segmentation_models_pytorch as smp
+from monai.networks.nets import UNet, SegResNet, AttentionUnet, UNETR, SwinUNETR
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss, DiceFocalLoss, DiceCELoss
 from losses import L1DFL
@@ -31,6 +33,7 @@ import matplotlib.pyplot as plt
 from glob import glob 
 import pandas as pd
 import numpy as np
+import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import os
 import nibabel as nb
@@ -272,7 +275,7 @@ def get_kernels_strides(patch_size, spacings):
     strides.insert(0, len(spacings) * [1])
     kernels.append(len(spacings) * [3])
     return kernels, strides
-#%%
+#%%    
 def get_model(network_name = 'unet', input_patch_size=128):
     if network_name == 'unet':
         model = UNet(
@@ -305,14 +308,22 @@ def get_model(network_name = 'unet', input_patch_size=128):
         model = UNETR(
             in_channels=2,  
             out_channels=2,
-            img_size=(96, 96, 96),        
-            feature_size=16,
-            hidden_size=768,              
-            mlp_dim=3072,                 
-            num_heads=12,                 
+            img_size=(128,128,128),        
+            feature_size=8,
+            hidden_size=256,              
+            mlp_dim=1024,                 
+            num_heads=4,                 
             proj_type="conv",
             norm_name="instance",
             res_block=True,
+        )
+    elif network_name == 'swinunetr':
+        model = SwinUNETR(
+            img_size=(96,96,96),
+            in_channels=2,
+            out_channels=2,
+            feature_size=48,
+            use_checkpoint=True
         )
     else:
         pass
@@ -320,11 +331,12 @@ def get_model(network_name = 'unet', input_patch_size=128):
 
 
 #%%
-def get_loss_function():
+def get_loss_function(*args):
     # loss_function = DiceFocalLoss(to_onehot_y=True, softmax=True, lambda_dice=1.0, lambda_focal=1.0)
     # loss_function = DiceLoss(to_onehot_y=True, softmax=True)
     # loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
-    loss_function = L1DFL()
+    print(args[0], args[1])
+    loss_function = L1DFL(gamma=args[0], epsilon=args[1])
     return loss_function
 
 def get_optimizer(model, learning_rate=2e-4, weight_decay=1e-5):
@@ -339,9 +351,10 @@ def get_scheduler(optimizer, max_epochs=1000):
     scheduler = CosineAnnealingLR(optimizer, T_max=max_epochs, eta_min=0)
     return scheduler
 
-def get_validation_sliding_window_size(input_patch_size=128):
+def get_validation_sliding_window_size(network_name, input_patch_size=128):
     dict_W_for_N = {
         64:64,
+        96:96,
         128:128,
         160:192,
         192:192,
@@ -349,4 +362,8 @@ def get_validation_sliding_window_size(input_patch_size=128):
         256:256
     }
     vlsz = dict_W_for_N[input_patch_size]
+    # if network_name=='swin_2d':
+    #     return (vlsz, vlsz)
+    
+    # else:  
     return (vlsz, vlsz, vlsz)
