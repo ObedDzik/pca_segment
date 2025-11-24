@@ -47,9 +47,14 @@ class L1DFL(nn.Module):
         counts = counts.scatter_add(0, bucket_idx, torch.ones_like(g))
 
         density = counts / (widths + 1e-8)
+        
+        beta = torch.where(density[bucket_idx] > 0, 
+                   N / density[bucket_idx], 
+                   torch.zeros_like(density[bucket_idx]))
 
-        beta = density[bucket_idx]
-        beta = N / (beta + 1e-8)
+
+        # beta = density[bucket_idx]
+        # beta = N / (beta + 1e-8)
         beta = beta.view_as(gradients)
 
         weighted_intersection = (beta * probabilities * targets).sum(dim=spatial_dims)
