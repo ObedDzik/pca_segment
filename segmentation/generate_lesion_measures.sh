@@ -1,1 +1,1 @@
-python generate_lesion_measures.py --fold=1 --network-name='attunet' --input-patch-size=128
+python generate_lesion_measures.py --fold=1 --network-name='unetr' --input-patch-size=128

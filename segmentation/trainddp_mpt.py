@@ -33,6 +33,7 @@ from initialize_train import (
 )
 
 import sys
+import re
 config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 print(config_dir)
 # print(sys.path)
@@ -40,6 +41,7 @@ sys.path.append(config_dir)
 from config import RESULTS_FOLDER
 torch.backends.cudnn.benchmark = True
 from torch.cuda.amp import GradScaler, autocast #MixedPrecisionTraining
+from torch.utils.data import Dataset
 
 #%%
 def ddp_setup():
@@ -79,22 +81,9 @@ def load_train_objects(args):
         metric
     )
 
-
 def prepare_dataset(data, transforms, args):
     dataset = CacheDataset(data=data, transform=transforms, cache_rate=args.cache_rate, num_workers=args.num_workers)
     return dataset
-
-# freeze encoder
-def freeze_encoder(model):
-    for name, param in model.vit.named_parameters():
-        if "patch_embed.proj" not in name:
-            param.requires_grad = False
-
-# unfreeze encoder
-def unfreeze_encoder(model):
-    for param in model.vit.parameters():
-        param.requires_grad = True
-
 
 def main_worker(save_models_dir, save_logs_dir, args):
     # init_process_group
@@ -112,8 +101,8 @@ def main_worker(save_models_dir, save_logs_dir, args):
     train_data, valid_data, train_transforms, valid_transforms, model, loss_function, optimizer, scheduler, metric = load_train_objects(args)
 
     # get dataset of object-type CacheDataset 
-    train_dataset = prepare_dataset(train_data, train_transforms, args)
-    valid_dataset = prepare_dataset(valid_data, valid_transforms, args)
+    train_dataset= prepare_dataset(train_data, train_transforms, args)
+    valid_dataset= prepare_dataset(valid_data, valid_transforms, args)
 
     # get DistributedSampler instances for both training and validation dataloader
     # this will be used to split data into different GPUs
@@ -152,35 +141,6 @@ def main_worker(save_models_dir, save_logs_dir, args):
     max_epochs = args.epochs
     val_interval = args.val_interval
     
-    if args.network_name == "unetr":
-        vit_encoder = model.vit
-        patch_size = ensure_tuple_rep(vit_encoder.patch_embed.patch_size, 3)
-        embedding_dim = vit_encoder.hidden_size
-
-        # Replacing the first conv layer because of mismatch with pretrained network
-        vit_encoder.patch_embed.proj = torch.nn.Conv3d(
-            in_channels=2,
-            out_channels=embedding_dim,
-            kernel_size=patch_size,
-            stride=patch_size,
-        )
-        
-        print("Loading Weights from the Path")
-        
-        ckpt = torch.load("/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/ssl_pretrained_weights.pth")
-        encoder_dict = {
-            k.replace("module.", "").replace("encoder.", ""): v
-            for k, v in ckpt["state_dict"].items()
-            if "encoder" in k and "patch_embed.proj" not in k
-        }
-
-        # Load into model's ViT encoder
-        missing, unexpected = model.vit.load_state_dict(encoder_dict, strict=False)
-        
-        print("Loaded pretrained weights (except input conv)")
-        print(f"Missing keys: {missing}")
-        print(f"Unexpected keys: {unexpected}")
-
     model = model.to(device)
     epoch_loss_values = []
     metric_values = []
@@ -191,13 +151,6 @@ def main_worker(save_models_dir, save_logs_dir, args):
     scaler = GradScaler() #MixedPrecisionTraining
 
     for epoch in range(max_epochs):
-        
-        if epoch == 0:
-            freeze_encoder(model)
-            print("Encoder frozen.")
-        elif epoch == 10:
-            unfreeze_encoder(model)
-            print("Encoder unfrozen.")
         
         epoch_start_time = time.time()
         if dist.get_rank() == 0:
@@ -219,7 +172,9 @@ def main_worker(save_models_dir, save_logs_dir, args):
                 loss = loss_function(outputs, labels)
             # loss.backward()             
             scaler.scale(loss).backward()  #MixedPrecisionTraining
-            # optimizer.step()
+            # Unscale gradients before clipping
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             scaler.step(optimizer)  #MixedPrecisionTraining
             scaler.update()  #MixedPrecisionTraining
             epoch_loss += loss.item()
@@ -246,7 +201,7 @@ def main_worker(save_models_dir, save_logs_dir, args):
                         val_data['CTPT'].to(device),
                         val_data['GT'].to(device),
                     )
-                    roi_size = get_validation_sliding_window_size(args.input_patch_size) 
+                    roi_size = get_validation_sliding_window_size(args.network_name, args.input_patch_size) 
                     sw_batch_size = args.sw_bs
                     val_outputs = sliding_window_inference(
                         val_inputs, roi_size, sw_batch_size, model)

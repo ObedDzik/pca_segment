@@ -30,8 +30,8 @@ config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.append(config_dir)
 # from config import RESULTS_FOLDER
 #%%
-RESULTS_FOLDER = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/old_segresnet_results/fold4/L1ghdl_ce"
-SAVE_FOLDER = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/test_predictions/segresnet_preds/L1ghdl_ce"
+RESULTS_FOLDER = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/results"
+SAVE_FOLDER = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/test_predictions/unetr_preds/dicefocal"
 def convert_to_4digits(str_num):
     if len(str_num) == 1:
         new_num = '000' + str_num
@@ -69,7 +69,7 @@ def main(args):
     # find the best model for this experiment from the training/validation logs
     # best model is the model with the best validation `Metric` (DSC)
     save_logs_dir = os.path.join(RESULTS_FOLDER, 'logs')
-    validlog_fname = os.path.join(save_logs_dir, 'fold'+str(fold), network, experiment_code, 'validlog_gpu1.csv')
+    validlog_fname = os.path.join(save_logs_dir, 'fold'+str(fold), network, experiment_code, 'validlog_gpu0.csv')
     validlog = pd.read_csv(validlog_fname)
     best_epoch = 2*(np.argmax(validlog['Metric']) + 1)
     best_metric = np.max(validlog['Metric'])

@@ -21,11 +21,18 @@ def main(args):
     inputsize = args.input_patch_size
     experiment_code = f"{network}_fold{fold}_randcrop{inputsize}"
     
-    RESULTS_FOLDER = f"/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/test_predictions/\
-attunet_preds/L1ghdlfocal"
+#     RESULTS_FOLDER = f"/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/test_predictions/\
+# unetr_preds/dicefocal"
+#     save_lesionmeasures_dir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
+# single_fold_results/unetr/fold1model/dicefocal"
+
+    RESULTS_FOLDER = f"/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
+test_predictions/sammed_preds/fold1/diceloss"
     save_lesionmeasures_dir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
-single_fold_results/attunet/fold1model/L1ghdl"
-    preddir = os.path.join(RESULTS_FOLDER, 'predictions', f'fold{fold}', network, experiment_code)
+single_fold_results/sammed/fold1model/diceloss"
+
+    # preddir = os.path.join(RESULTS_FOLDER, 'predictions', f'fold{fold}', network, experiment_code)
+    preddir = RESULTS_FOLDER
     
     # preddir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/test_predictions/attunet_preds/L1ghdlfocal/ensemble_results"
     # save_lesionmeasures_dir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/test_predictions/attunet_preds/L1ghdlfocal"
