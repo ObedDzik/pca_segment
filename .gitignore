@@ -32,3 +32,5 @@ segmentation/calculate_ensemble_test_metrics.py
 segmentation/data_explore.py
 segmentation/valid_predict.py
 segmentation/visualize_pred.py
+segmentation/check_loss.ipynb
+segmentation/plot_lesions_new.ipynb
