@@ -34,3 +34,5 @@ segmentation/valid_predict.py
 segmentation/visualize_pred.py
 segmentation/check_loss.ipynb
 segmentation/plot_lesions_new.ipynb
+__pycache__
+metrics/__pycache__

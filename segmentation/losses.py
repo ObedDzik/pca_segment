@@ -54,13 +54,8 @@ class L1DFL(nn.Module):
         density = counts / (widths + 1e-8)
         beta_raw = N / (density[bucket_idx] + 1e-8)
         
-        # median instead of mean for more robust normalization
-        nonzero_mask = beta_raw > 0
-        if nonzero_mask.sum() > 0:
-            median_beta = beta_raw[nonzero_mask].median()
-            beta_norm = beta_raw / (median_beta + 1e-8)
-        else:
-            beta_norm = torch.ones_like(beta_raw)
+        median_beta = beta_raw.median()
+        beta_norm = beta_raw / (median_beta + 1e-8)
         
         beta = torch.clamp(beta_norm, min=self.min_beta, max=self.max_beta)
         beta = beta.view_as(gradients)

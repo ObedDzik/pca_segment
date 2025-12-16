@@ -7,20 +7,31 @@ import numpy as np
 import os
 #%%
 #THINGS TO CHANGE
-fold = 0
+# fold = 0
 WORKING_FOLDER = "/home/jhubadmin/Desktop/segmentation_research/pca_segment/"
-pred_dir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
-validation_predictions/unet/fold0/L1ghdlfocal/predictions/fold0/unet/unet_fold0_randcrop128/" 
+# pred_dir = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
+# test_predictions/unetr_preds/dicefocal/predictions/fold1/unetr/unetr_fold1_randcrop128" 
+# save_path = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
+# single_fold_results/unetr/fold1model/dicefocal" 
+
+pred_dir = f"/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
+test_predictions/sammed_preds/fold1/L1ghdl"
 save_path = "/data/blobfuse/PSMA_PCA_LESIONS_SEGMENTATION/data_resampled_results/\
-validation_predictions/unet/fold0/L1ghdlfocal"
+single_fold_results/sammed/fold1model/L1ghdl"
 #%%
-trainvalid_fpath = os.path.join(WORKING_FOLDER, 'data_split/train_filepaths.csv')
-trainvalid_df = pd.read_csv(trainvalid_fpath)
-train_df = trainvalid_df[trainvalid_df['FoldID'] != fold]
-valid_df = trainvalid_df[trainvalid_df['FoldID'] == fold]
-ct_files = valid_df["CTPATH"].values
-pt_files = valid_df["PTPATH"].values
-gt_files = valid_df["GTPATH"].values
+# trainvalid_fpath = os.path.join(WORKING_FOLDER, 'data_split/train_filepaths.csv')
+# trainvalid_df = pd.read_csv(trainvalid_fpath)
+# train_df = trainvalid_df[trainvalid_df['FoldID'] != fold]
+# valid_df = trainvalid_df[trainvalid_df['FoldID'] == fold]
+# ct_files = valid_df["CTPATH"].values
+# pt_files = valid_df["PTPATH"].values
+# gt_files = valid_df["GTPATH"].values
+
+test_fpath = os.path.join(WORKING_FOLDER, 'data_split/test_filepaths.csv')
+test_df = pd.read_csv(test_fpath)
+ct_files = test_df["CTPATH"].values
+pt_files = test_df["PTPATH"].values
+gt_files = test_df["GTPATH"].values
 #%%
 _files = sorted(os.listdir(pred_dir))
 pred_files=[]
@@ -186,6 +197,7 @@ def create_and_save_dataframe(filenames, predfiles, pt_files, gt_files):
                 row.update({f'{metric}_pred': np.nan for metric in ['suvmean', 'suvmax', 'mtv', 'tlg']})
                 row.update({'lesionwise_dice': np.nan})
                 df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+        print(f'processed patient{index+1}')
     return df
 #%%
 df = create_and_save_dataframe(_files, pred_files, pt_files, gt_files)
